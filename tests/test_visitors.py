@@ -19,3 +19,4 @@ def test_states():
     states = lookup_visitor.lookup(modast, ast.AstNodeType.STATE_BLOCK)
     for state in states:
         print(nmodl.to_nmodl(state))
+
