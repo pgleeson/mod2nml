@@ -90,18 +90,24 @@ def find_currents(modast):
     return curr_eqs
 
 def match_cond_states(cond, states):
-    print(f'trying to match conductance{cond} to product of powers of {states}')
+    print(f'trying to match conductance {cond} to product of powers of {states}')
 
-    wilds = sp.numbered_symbols('_a', cls=sp.Wild)
+    #wilds = sp.numbered_symbols('_a', cls=sp.Wild)
+    #pattern = sp.Wild('gbar')
+    #for state in states:
+    #    sym = next((s for s in cond.free_symbols if s.name == state), 1)
+    #    pattern = pattern * sym**next(wilds)
+    #print(cond.match(pattern))
 
-    pattern = sp.Wild('gbar')
-    for state in states:
-        sym = next((s for s in cond.free_symbols if s.name == state), sp.Wild('xxx'))
-        pattern = pattern * sym**next(wilds)
-    import pdb; pdb.set_trace()
-    print(cond.match(pattern))
+    state_exps = {}
+    state_syms = {s for s in cond.free_symbols if s.name in states} #TODO: should be obj prop
+    rest = cond
+    for s in state_syms:
+        rest, state_exps[s] = rest.as_independent(s, as_Mul=True)
+    state_exps['gbar'] = rest
+    return state_exps
 
-
+    print(state_exps)
 def process_current_law(ast):
     currents = find_currents(ast)
     for current, ctxt in currents.items():
@@ -118,7 +124,7 @@ def process_current_law(ast):
 
         states = get_state_vars(ast)
         print('\tfound state variables', states)
-        match_cond_states(g, states)
+        print(match_cond_states(g, states))
 
     # ver se g é produto de state variables - serão as rates
 
