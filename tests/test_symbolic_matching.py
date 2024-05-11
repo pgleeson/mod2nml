@@ -1,7 +1,9 @@
-from sympy import symbols, Wild, solve, evaluate, parse_expr
+from sympy import symbols, Wild, solve, evaluate, parse_expr, simplify
 from sympy import exp, log
-v, rate, midpoint, scale, x, y, m, h, n, alpha, beta, ninf, taun = symbols(
-    'v,rate,midpoint,scale,x,y,m,h,n,alpha,beta,ninf,taun', real=True)
+#v, rate, midpoint, scale, x, y, m, h, n, alpha, beta, ninf, taun = symbols(
+    #'v,rate,midpoint,scale,x,y,m,h,n,alpha,beta,ninf,taun', real=True)
+
+v, rate, midpoint, scale = symbols('v,rate,midpoint,scale', real=True)
 
 #    x = (v-midpoint)/scale
 #    hhexp = rate * exp(x)
@@ -40,9 +42,11 @@ def match_HHExpLinearRate(expr):
     ret = {}
     if m := expr.match(lin/(exp(V)-1)):
         sol = solve(m[V]-vv, midpoint, scale)
+        m[lin] = -m[lin]
     elif m := expr.match(lin/(1-exp(V))):
         sol = solve(m[V]-vv, midpoint, scale)
     if m:
+        sol[scale] = -sol[scale]
         ret['rate'] = solve(m[lin]/rate-vv.subs(sol),rate)[0]
         ret['midpoint'] = sol[midpoint]
         ret['scale'] = sol[scale]
@@ -60,7 +64,7 @@ def test_match_hhexplinear():
     rms = match_HHExpLinearRate(alpha)
     assert rms['rate'] == 0.1
     assert rms['midpoint'] == -60
-    assert rms['scale'] == -10
+    assert rms['scale'] == 10
 
 def test_match_hhsigmoid():
     minf  = 1 / ( 1 + exp( ( - v - 48 ) / 10 ) )
@@ -79,16 +83,23 @@ def test_match_standard_forms():
 
         if  m := match_HHExpRate(expr):
             print(ex, 'matches HHExpRate!')
+            x = (v-m['midpoint'])/m['scale']
+            matched = m['rate'] * exp(x)
             print('\t', m)
 
         if  m := match_HHExpLinearRate(expr):
             print(ex, 'matches HHExpLinearRate!')
             print('\t', m)
+            #m['scale'] = -m['scale']
+            x = (v-m['midpoint'])/m['scale']
+            matched = m['rate'] * x / (1 - exp(-x))
 
         if  m := match_HHSigmoidRate(expr):
             print(ex, 'matches HHSigmoidRate!')
             print('\t', m)
-
+            x = (v-m['midpoint'])/m['scale']
+            matched = m['rate'] / (1 + exp(-x))
+        assert simplify(expr / matched) == 1
 # mAlpha = (0.182 * (v- -32))/(1-(exp(-(v- -32)/6)))
 # mBeta  = (0.124 * (-v -32))/(1-(exp(-(-v -32)/6)))
 # hAlpha = (-0.015 * (v- -60))/(1-(exp((v- -60)/6)))
