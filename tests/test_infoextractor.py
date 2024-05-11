@@ -10,21 +10,18 @@ def parse_mod(modstring):
     ast = driver.parse_string(modstring)
     return ast
 
-def sympy_context_for_current(current, blk_vars, blk_assignments):
-    # TODO: only do this for NAMEs relevant to the current
-    # lookup_visitor = visitor.AstLookupVisitor()
-    # names = {n.get_name() for n in
-    #               lookup_visitor.lookup(bp, ast.AstNodeType.NAME)}
-    # names_blk = {}
+def sympy_context_for_var(var, blk_vars, blk_assignments):
+    # TODO: do that only for assignments that are relevant to var
+    # (visit NAME nodes in its def)
 
     # locals / globals
-    ctxt = OrderedDict([(var, sp.symbols(var, real=True))
-                        for var in blk_vars
-                        if var not in blk_assignments.keys()])
+    ctxt = OrderedDict([(v, sp.symbols(v, real=True))
+                        for v in blk_vars
+                        if v not in blk_assignments.keys()])
 
-    for var, eq in blk_assignments.items():
-        ctxt[var] = sp.sympify(eq, ctxt)
-        if var == current:
+    for v, eq in blk_assignments.items():
+        ctxt[v] = sp.sympify(eq, ctxt)
+        if v == var:
             break
     return ctxt
 
@@ -42,16 +39,16 @@ def get_global_vars(modast):
                    table.get_variables_with_properties(props)}
     return global_vars
 
-def get_local_vars(bp):
-    table = bp.get_statement_block().get_symbol_table()
+def get_local_vars(block):
+    table = block.get_statement_block().get_symbol_table()
     props = symtab.NmodlType.local_var
     local_vars = {var.get_name() for var in
                   table.get_variables_with_properties(props)}
     return local_vars
 
-def get_assignments(bp):
+def get_assignments(blk):
     lookup_visitor = visitor.AstLookupVisitor()
-    binexprs = lookup_visitor.lookup(bp, ast.AstNodeType.BINARY_EXPRESSION)
+    binexprs = lookup_visitor.lookup(blk, ast.AstNodeType.BINARY_EXPRESSION)
     assignments = OrderedDict()
     for expr in binexprs:
         if expr.lhs.is_var_name() and expr.op.eval() == '=':
@@ -67,6 +64,16 @@ def get_state_vars(modast):
                   lookup_visitor.lookup(modast, ast.AstNodeType.ASSIGNED_DEFINITION)}
     return state_vars
 
+
+def scope_for_block(block):
+    prog = block
+    while prog.is_program() is False:
+        prog = prog.parent
+    globs = get_global_vars(prog)
+    locs = get_local_vars(block)
+    return locs | globs
+
+
 def find_currents(modast):
     lookup_visitor = visitor.AstLookupVisitor()
     useions = lookup_visitor.lookup(modast, ast.AstNodeType.USEION)
@@ -74,30 +81,19 @@ def find_currents(modast):
 
     currents = {}
     for useion in useions:
-        # print('using ion', useion.name, 'writelist',
-        #      [w.get_node_name()  for w in useion.writelist])
         for w in useion.writelist:
             currents[w.get_node_name()] = useion.get_node_name()
 
-    globs = get_global_vars(modast)
-    locs = get_local_vars(bps[0])  # TODO: assuming single BP
+    scope = scope_for_block(bps[0])# TODO: assuming single BP
     asgns = get_assignments(bps[0])
 
-    scope = locs | globs
-    curr_eqs = {c: sympy_context_for_current(c, scope, asgns)
+    curr_eqs = {c: sympy_context_for_var(c, scope, asgns)
                 for c in currents}
 
     return curr_eqs
 
 def match_cond_states(cond, states):
     print(f'trying to match conductance {cond} to product of powers of {states}')
-
-    #wilds = sp.numbered_symbols('_a', cls=sp.Wild)
-    #pattern = sp.Wild('gbar')
-    #for state in states:
-    #    sym = next((s for s in cond.free_symbols if s.name == state), 1)
-    #    pattern = pattern * sym**next(wilds)
-    #print(cond.match(pattern))
 
     state_exps = {}
     state_syms = {s for s in cond.free_symbols if s.name in states} #TODO: should be obj prop
@@ -108,6 +104,19 @@ def match_cond_states(cond, states):
     return state_exps
 
     print(state_exps)
+
+def check_gate_dynamics(modast, gbar_n_gates):
+    lookup_visitor = visitor.AstLookupVisitor()
+    deqs = lookup_visitor.lookup(modast, ast.AstNodeType.DERIVATIVE_BLOCK)
+    dyn_eqs = {}
+    if deqs:
+        primes = lookup_visitor.lookup(deqs[0], ast.AstNodeType.PRIME_NAME)
+        scope = scope_for_block(deqs[0])
+        asgns = get_assignments(deqs[0])
+        dyn_eqs = {v.get_node_name(): sympy_context_for_var(v.get_node_name(), scope, asgns)
+                 for v in primes}
+    print(dyn_eqs)
+
 def process_current_law(ast):
     currents = find_currents(ast)
     for current, ctxt in currents.items():
@@ -124,7 +133,10 @@ def process_current_law(ast):
 
         states = get_state_vars(ast)
         print('\tfound state variables', states)
-        print(match_cond_states(g, states))
+        gbar_n_gates = match_cond_states(g, states)
+        print(gbar_n_gates)
+
+        print(check_gate_dynamics(ast, gbar_n_gates))
 
     # ver se g é produto de state variables - serão as rates
 
@@ -188,3 +200,4 @@ def test_find_gates():
     }
     """
     process_current_law(parse_mod(mod))
+
