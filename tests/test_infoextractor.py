@@ -136,14 +136,17 @@ def process_current_law(ast):
         gbar_n_gates = match_cond_states(g, states)
         print(gbar_n_gates)
 
+        # create gatehhrate for each particle
+        # try to match dynamics to known forms:
+        #    (minf-m)/tau:  gateHHtauInf
+        #            timeCourse (HHexp HHSigmoid HHExplinear)
+        #            steadyState (HHexp HHSigmoid HHExplinear)
+        #    (1-n)*alpha - n*beta : gateHHrates
+        #            forwardRate (HHexp HHSigmoid HHExplinear)
+        #            reverseRate (HHexp HHSigmoid HHExplinear)
+
         print(check_gate_dynamics(ast, gbar_n_gates))
 
-    # ver se g é produto de state variables - serão as rates
-
-    # criar um gatehhrate para cada
-    # para a cinética, fazer otimização e tentar match
-    # (minf-m)/tau:  gatehhtauinf
-    # (1-n)*alpha - n*beta : forwardrate (HHexp HHSigmoid HHExplinear)
 
 
 #def test_hhrates():
