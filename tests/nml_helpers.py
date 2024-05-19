@@ -24,6 +24,7 @@ class baseHHrate:
         self.midpoint = m
         self.scale = s
 
+
 class HHExpRate(baseHHrate):
     @classmethod
     def match(cls, expr):
@@ -44,6 +45,7 @@ class HHExpRate(baseHHrate):
         #    ret['midpoint'] = sol[midpoint]
         #    ret['scale'] = sol[scale]
         # return ret
+
     def as_symbolic(self):
         x = (v - self.midpoint) / self.scale
         return self.rate * sp.exp(x)
@@ -69,6 +71,7 @@ class HHSigmoidRate(baseHHrate):
         #    ret['midpoint'] = sol[midpoint]
         #    ret['scale'] = sol[scale]
         # return ret
+
     def as_symbolic(self):
         x = (v - self.midpoint) / self.scale
         return self.rate / (1 + sp.exp(-x))
@@ -100,6 +103,7 @@ class HHExpLinearRate(baseHHrate):
         #    ret['midpoint'] = sol[midpoint]
         #    ret['scale'] = sol[scale]
         # return ret
+
     def as_symbolic(self):
         x = (v - self.midpoint) / self.scale
         return self.rate * x / (1 - sp.exp(-x))
@@ -107,11 +111,41 @@ class HHExpLinearRate(baseHHrate):
 
 STD_RATES = [cls for cls in baseHHrate.__subclasses__()]
 
+
 def match_standard_rates(expr):
     matched = None
     for r in STD_RATES:
         if m := r.match(expr):
             matched = m
             break
-    return matched.as_symbolic()
+    return matched
 
+
+def replace_standards_in_sequence(seq, ctxt):
+    syms = sp.numbered_symbols("std")
+    for name, expr in seq.items():
+        syex = sp.S(expr, ctxt)
+        if match_standard_rates(sp.S(expr, ctxt).doit()):
+            syex = next(syms)
+        ctxt[name] = syex
+
+    return ctxt
+
+
+def match_alpha_beta_tau_inf(expr, statevar):
+    n = statevar
+    a = sp.Wild("a", exclude=[n])
+    b = sp.Wild("b", exclude=[n])
+
+    ddn = expr.diff(n)  # d(dn/dt)/dn = -1/tau = -1/(alpha+beta) for 1st order kinetics
+    eqs = {}
+    if m := (
+        sp.solve(expr, n)[0].match(a / (a + b))
+    ):  # if that matches, we have inf = alpha/(alpha + beta)
+        eqs["alpha"] = m[a]
+        eqs["beta"] = m[b]
+    elif s := sp.solve(expr, n):
+        eqs["tau"] = -1 / ddn
+        eqs["inf"] = s[0]
+
+    return eqs
