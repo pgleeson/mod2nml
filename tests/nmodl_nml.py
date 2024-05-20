@@ -1,29 +1,16 @@
+from collections import OrderedDict
 import nmodl.dsl as nmodl
 from nmodl import ast, visitor, symtab
-from collections import OrderedDict
-import sympy as sp
-#from functools import lru_cache
+import symbolic as sym
+import nml_helpers as nml
 
+#from functools import lru_cache
 #@lru_cache
 def parse_mod(modstring):
     driver = nmodl.NmodlDriver()
     ast = driver.parse_string(modstring)
     return ast
 
-def sympy_context_for_var(var, blk_vars, blk_assignments):
-    # TODO: do that only for assignments that are relevant to var
-    # (visit NAME nodes in its def)
-
-    # locals / globals
-    ctxt = OrderedDict([(v, sp.symbols(v, real=True))
-                        for v in blk_vars
-                        if v not in blk_assignments.keys()])
-
-    for v, eq in blk_assignments.items():
-        ctxt[v] = sp.sympify(eq, ctxt)
-        if v == var:
-            break
-    return ctxt
 
 def get_global_vars(modast):
     symtab.SymtabVisitor().visit_program(modast)
@@ -87,7 +74,7 @@ def find_currents(modast):
     scope = scope_for_block(bps[0])# TODO: assuming single BP
     asgns = get_assignments(bps[0])
 
-    curr_eqs = {c: sympy_context_for_var(c, scope, asgns)
+    curr_eqs = {c: sym.sympy_context_for_var(c, scope, asgns)
                 for c in currents}
 
     return curr_eqs
@@ -113,7 +100,7 @@ def check_gate_dynamics(modast, gbar_n_gates):
         primes = lookup_visitor.lookup(deqs[0], ast.AstNodeType.PRIME_NAME)
         scope = scope_for_block(deqs[0])
         asgns = get_assignments(deqs[0])
-        dyn_eqs = {v.get_node_name(): sympy_context_for_var(v.get_node_name(), scope, asgns)
+        dyn_eqs = {v.get_node_name(): sym.sympy_context_for_var(v.get_node_name(), scope, asgns)
                  for v in primes}
     print(dyn_eqs)
 
@@ -147,60 +134,4 @@ def process_current_law(ast):
 
         print(check_gate_dynamics(ast, gbar_n_gates))
 
-
-
-#def test_hhrates():
-#    #with open("sample_mods/k_hh_ab.mod") as f:
-#    with open("sample_mods/hh_ab.mod") as f:
-#        mod = f.read()
-#    process_current_law(parse_mod(mod))
-
-def test_find_current():
-    mod = """
-    NEURON {
-        USEION na READ ena WRITE ina
-        RANGE gna
-    }
-    BREAKPOINT {
-        LOCAL drf
-        drf = (v - ena)
-        ina = gna*drf
-    }
-    """
-    process_current_law(parse_mod(mod))
-
-def test_match_gates():
-    mod = """
-    NEURON {
-        USEION na READ ena WRITE ina
-        RANGE gna
-    }
-    STATE { m h }
-    BREAKPOINT {
-        ina = gna*m*m*m*h*(v - ena)
-    }
-    """
-    process_current_law(parse_mod(mod))
-
-def test_find_gates():
-    mod = """
-    NEURON {
-        USEION k READ ek WRITE ik REPRESENTS CHEBI:29103
-        RANGE gkbar, gk
-        RANGE gna
-    }
-    PARAMETER { gkbar = .036 }
-    STATE { n }
-    BREAKPOINT {
-        SOLVE states METHOD cnexp
-        gk = gkbar*n*n*n*n
-	    ik = gk*(v - ek)
-    }
-    DERIVATIVE states {
-        alpha = .01*-(v+55)/(exp(-(v+55)/10)-1)
-        beta = .125*exp(-(v+65)/80)
-        n' = alpha*(1-n)  - beta*n
-    }
-    """
-    process_current_law(parse_mod(mod))
 

@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import sympy as sp
 
 v, rate, midpoint, scale = sp.symbols("v,rate,midpoint,scale", real=True)
@@ -18,6 +19,20 @@ def extract_exp_arg(expr, inv=False):
     return ret
 
 
+def sympy_context_for_var(var, blk_vars, blk_assignments):
+    # TODO: do that only for assignments that are relevant to var
+    # (visit NAME nodes in its def)
+
+    # locals / globals
+    ctxt = OrderedDict([(v, sp.symbols(v, real=True))
+                        for v in blk_vars
+                        if v not in blk_assignments.keys()])
+
+    for v, eq in blk_assignments.items():
+        ctxt[v] = sp.sympify(eq, ctxt)
+        if v == var:
+            break
+    return ctxt
 
 
 def match_alpha_beta_tau_inf(expr, statevar):
