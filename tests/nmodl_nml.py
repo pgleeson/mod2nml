@@ -50,8 +50,9 @@ def get_assignments(blk):
 def get_state_vars(modast):
     lookup_visitor = visitor.AstLookupVisitor()
     state_blk = lookup_visitor.lookup(modast, ast.AstNodeType.STATE_BLOCK)
+    assert len(state_blk) == 1 #TODO: is >1 STATE even allowed?
     state_vars = {n.get_node_name() for n in
-                  lookup_visitor.lookup(modast, ast.AstNodeType.ASSIGNED_DEFINITION)}
+                  lookup_visitor.lookup(state_blk[0], ast.AstNodeType.ASSIGNED_DEFINITION)}
     return state_vars
 
 
