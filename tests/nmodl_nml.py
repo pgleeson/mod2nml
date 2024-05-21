@@ -84,15 +84,12 @@ def find_currents(modast):
     return curr_eqs
 
 def match_cond_states(cond, states):
-    print(f'\t matching conductance {cond} to product of powers of {states}', end=': ')
-
     state_exps = {}
-    state_syms = {s for s in cond.free_symbols if s.name in states} #TODO: should be obj prop
+    state_syms = {s for s in cond.free_symbols if s.name in states}
     rest = cond
     for s in state_syms:
         rest, state_exps[s] = rest.as_independent(s, as_Mul=True)
     state_exps['gbar'] = rest
-    print(state_exps)
     return state_exps
 
 
@@ -125,25 +122,24 @@ def simplify_derivatives(exprs, states):
 
 
 def conductance(current, ctxt):
-    print('\tCalculating conductance')
     curr_eq = ctxt[current]
     v = ctxt['v']
     g = curr_eq.diff(v)
-    print('\tdI/dv:', g)
-    if g != 0 and g.diff(v) == 0:
-        print(f'\t{current} seems ohmic!')
     return g
 
 def process_current_law(ast):
     for current, ctxt in find_currents(ast).items():
         print('Found current', current)
-        #print('\tsymbolic context:', list(ctxt.items()))
         g = conductance(current, ctxt)
+        print('\tConductance:', g)
+        if g != 0 and g.diff(ctxt['v']) == 0:
+            print(f'\t{current} seems ohmic!')
 
         states = get_state_vars(ast)
         print('\tfound state variables', states)
 
         gbar_n_gates = match_cond_states(g, states)
+        print(f'\tmatching conductances to product of powers of states', end=': ')
         print(gbar_n_gates)
 
         dxs = get_gate_dynamics(ast)
