@@ -3,11 +3,11 @@ import sympy as sp
 
 import nmodl_nml as m2n
 
-#def test_hhrates():
-#    #with open("sample_mods/k_hh_ab.mod") as f:
-#    with open("sample_mods/hh_ab.mod") as f:
-#        mod = f.read()
-#    process_current_law(m2n.parse_mod(mod))
+def test_hhrates():
+    #with open("sample_mods/k_hh_ab.mod") as f:
+    with open("sample_mods/hh_ab.mod") as f:
+        mod = f.read()
+    m2n.process_current_law(m2n.parse_mod(mod))
 
 def test_find_current():
     mod = """
