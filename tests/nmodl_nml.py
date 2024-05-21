@@ -83,7 +83,7 @@ def find_currents(modast):
     return curr_eqs
 
 def match_cond_states(cond, states):
-    print(f'trying to match conductance {cond} to product of powers of {states}')
+    print(f'\t matching conductance {cond} to product of powers of {states}', end=': ')
 
     state_exps = {}
     state_syms = {s for s in cond.free_symbols if s.name in states} #TODO: should be obj prop
@@ -91,11 +91,11 @@ def match_cond_states(cond, states):
     for s in state_syms:
         rest, state_exps[s] = rest.as_independent(s, as_Mul=True)
     state_exps['gbar'] = rest
+    print(state_exps)
     return state_exps
 
-    print(state_exps)
 
-def check_gate_dynamics(modast, gbar_n_gates):
+def get_gate_dynamics(modast):
     lookup_visitor = visitor.AstLookupVisitor()
     deqs = lookup_visitor.lookup(modast, ast.AstNodeType.DERIVATIVE_BLOCK)
     dyn_eqs = {}
@@ -118,8 +118,8 @@ def simplify_derivatives(exprs, states):
             return None
         ctxt = {s:sym.sp.Symbol(s, real=True) for s in locvars}
         #ctxt[s] = sym.sp.Symbol(s, real=True)
-        replaced = nml.replace_standards_in_sequence(exprseq, ctxt)
-        res[s] = nml.match_alpha_beta_tau_inf(replaced[f'{s}\\prime'], ctxt[s])
+        replaced, replacements = nml.replace_standards_in_sequence(exprseq, ctxt)
+        res[s] = nml.match_dynamics(replaced, ctxt[s], replacements)
     return res
 
 
@@ -134,25 +134,18 @@ def conductance(current, ctxt):
     return g
 
 def process_current_law(ast):
-    currents = find_currents(ast)
-    for current, ctxt in currents.items():
+    for current, ctxt in find_currents(ast).items():
         print('Found current', current)
         #print('\tsymbolic context:', list(ctxt.items()))
         g = conductance(current, ctxt)
+
         states = get_state_vars(ast)
         print('\tfound state variables', states)
+
         gbar_n_gates = match_cond_states(g, states)
         print(gbar_n_gates)
 
-        # create gatehhrate for each particle
-        # try to match dynamics to known forms:
-        #    (minf-m)/tau:  gateHHtauInf
-        #            timeCourse (HHexp HHSigmoid HHExplinear)
-        #            steadyState (HHexp HHSigmoid HHExplinear)
-        #    (1-n)*alpha - n*beta : gateHHrates
-        #            forwardRate (HHexp HHSigmoid HHExplinear)
-        #            reverseRate (HHexp HHSigmoid HHExplinear)
-        dxs = check_gate_dynamics(ast, gbar_n_gates)
+        dxs = get_gate_dynamics(ast)
         simp_dxs = simplify_derivatives(dxs,states)
 
 

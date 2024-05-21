@@ -6,7 +6,9 @@ class baseHHrate:
         self.rate = r
         self.midpoint = m
         self.scale = s
-
+    def __repr__(self):
+        return f'{type(self).__name__}[rate:{self.rate:.3f}, '\
+                f'midpoint:{self.midpoint}, scale:{self.scale}]'
 
 class HHExpRate(baseHHrate):
     @classmethod
@@ -91,24 +93,74 @@ class HHExpLinearRate(baseHHrate):
         x = (v - self.midpoint) / self.scale
         return self.rate * x / (1 - sp.exp(-x))
 
+def match_dynamics(exprs, statevar, replacements={}):
+    n = statevar
+    a = sp.Wild("a", exclude=[n])
+    b = sp.Wild("b", exclude=[n])
+    expr = exprs[statevar.name+'\\prime']
+    ddn = expr.diff(n)  # d(dn/dt)/dn = -1/tau = -1/(alpha+beta) for 1st order kinetics
+    #eqs = {}
+    ret = None
+    if m := (
+        sp.solve(expr, n)[0].match(a / (a + b))
+    ):  # if that matches, we have inf = alpha/(alpha + beta)
+        alpha = m[a]
+        beta = m[b]
+        for r,v in replacements.items():
+            if exprs[r] == alpha:
+                alpha = v
+            if exprs[r] == beta:
+                beta = v
+        ret = GateHHrates(alpha, beta)
+        #eqs["alpha"] = m[a]
+        #eqs["beta"] = m[b]
+    elif s := sp.solve(expr, n):
+        tau = -1/ddn
+        inf = s[0]
+        for r,v in replacements.items():
+            if exprs[r] == tau:
+                tau = v
+            if exprs[r] == inf:
+                inf = v
+        ret = GateHHtauInf(tau, inf)
+        #eqs["tau"] = -1 / ddn
+        #eqs["inf"] = s[0]
 
-STD_RATES = [cls for cls in baseHHrate.__subclasses__()]
+    return ret
+    #return eqs
+
+class GateHHrates:
+    def __init__(self, alpha, beta):
+        self.forward = alpha
+        self.reverse = beta
+    def __repr__(self):
+        return f'{type(self).__name__}[forward:{self.forward}, '\
+                f'reverse:{self.reverse}]'
+
+class GateHHtauInf:
+    def __init__(self, tau, inf):
+        self.time_course = tau
+        self.steady_state = inf
+    def __repr__(self):
+        return f'{type(self).__name__}[time_course:{self.time_course}, '\
+                f'steady_state:{self.steady_state}]'
 
 
-def match_standard_rates(expr):
-    matched = None
-    for r in STD_RATES:
+def match_standard_rates(expr, subs={}):
+    m = None
+    for r in [cls for cls in baseHHrate.__subclasses__()]:
         if m := r.match(expr):
-            matched = m
             break
-    return matched
+    return m
 
 def replace_standards_in_sequence(seq, ctxt):
+    replacements = {}
     syms = sp.numbered_symbols("std")
     for name, expr in seq.items():
         syex = sp.S(expr, ctxt)
-        if match_standard_rates(sp.S(expr, ctxt).doit()):
+        if m:= match_standard_rates(sp.S(expr, ctxt).doit()):
             syex = next(syms)
+            replacements[name] = m
         ctxt[name] = syex
 
-    return ctxt
+    return ctxt, replacements

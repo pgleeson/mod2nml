@@ -45,7 +45,7 @@ def test_match_gates():
     assert gate_pow['m'] == 'm**3'
     assert gate_pow['h'] == 'h'
 
-def test_find_gates():
+def test_gate_dynamics():
     mod = """
     NEURON {
         USEION k READ ek WRITE ik REPRESENTS CHEBI:29103
@@ -65,5 +65,36 @@ def test_find_gates():
         n' = alpha*(1-n)  - beta*n
     }
     """
-    m2n.process_current_law(m2n.parse_mod(mod))
+    ast = m2n.parse_mod(mod)
+    states = m2n.get_state_vars(ast)
+    dxs = m2n.get_gate_dynamics(ast)
+    simp_dxs = m2n.simplify_derivatives(dxs,states)
+    print(simp_dxs)
+
+
+def test_gate_dynamics_ti():
+    mod = """
+    NEURON {
+        USEION k READ ek WRITE ik REPRESENTS CHEBI:29103
+        RANGE gkbar, gk
+        RANGE gna
+    }
+    PARAMETER { gkbar = .036 }
+    STATE { n }
+    BREAKPOINT {
+        SOLVE states METHOD cnexp
+        gk = gkbar*n*n*n*n
+	    ik = gk*(v - ek)
+    }
+    DERIVATIVE states {
+        tau = 10
+        inf = 1/(1+exp(-(v+65)/80))
+        n' = (inf-n)/tau
+    }
+    """
+    ast = m2n.parse_mod(mod)
+    states = m2n.get_state_vars(ast)
+    dxs = m2n.get_gate_dynamics(ast)
+    simp_dxs = m2n.simplify_derivatives(dxs,states)
+    print(simp_dxs)
 

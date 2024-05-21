@@ -72,7 +72,9 @@ def test_match_multiexpr_odes():
     exprs["ninf"] = "alphan/sum"
     exprs["dn"] = "(ninf-n)/taun"
 
-    replaced = nml.replace_standards_in_sequence(exprs, ctxt)
+    replaced, replacements = nml.replace_standards_in_sequence(exprs, ctxt)
     m = nml.match_alpha_beta_tau_inf(replaced["dn"], n)
     assert m["alpha"] == replaced["alphan"]
     assert m["beta"] == replaced["betan"]
+    assert type(replacements["betan"]) == nml.HHExpRate
+    assert type(replacements["alphan"]) == nml.HHExpLinearRate
