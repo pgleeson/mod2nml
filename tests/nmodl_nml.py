@@ -39,7 +39,10 @@ def get_assignments(blk):
     assignments = OrderedDict()
     for expr in binexprs:
         if expr.lhs.is_var_name() and expr.op.eval() == '=':
-            assignments[expr.lhs.get_node_name()] = nmodl.to_nmodl(
+            n = expr.lhs.get_node_name()
+            if expr.lhs.name.is_prime_name():
+                n = n+'\\prime'
+            assignments[n] = nmodl.to_nmodl(
                 expr.rhs, {nmodl.ast.UNIT, nmodl.ast.UNIT_DEF})
 
     return assignments
@@ -100,24 +103,42 @@ def check_gate_dynamics(modast, gbar_n_gates):
         primes = lookup_visitor.lookup(deqs[0], ast.AstNodeType.PRIME_NAME)
         scope = scope_for_block(deqs[0])
         asgns = get_assignments(deqs[0])
-        dyn_eqs = {v.get_node_name(): sym.sympy_context_for_var(v.get_node_name(), scope, asgns)
-                 for v in primes}
-    print(dyn_eqs)
+        #dyn_eqs = {v.get_node_name(): sym.sympy_context_for_var(v.get_node_name(), scope, asgns)
+        #         for v in primes}
+        dyn_eqs = {v.get_node_name(): (scope, asgns) for v in primes}
+    return dyn_eqs
+
+def simplify_derivatives(exprs, states):
+    res = {}
+    for s in states:
+        try:
+            locvars, exprseq = exprs[s]
+        except KeyError:
+            print("Couldn't find dynamics for variable", s)
+            return None
+        ctxt = {s:sym.sp.Symbol(s, real=True) for s in locvars}
+        #ctxt[s] = sym.sp.Symbol(s, real=True)
+        replaced = nml.replace_standards_in_sequence(exprseq, ctxt)
+        res[s] = nml.match_alpha_beta_tau_inf(replaced[f'{s}\\prime'], ctxt[s])
+    return res
+
+
+def conductance(current, ctxt):
+    print('\tCalculating conductance')
+    curr_eq = ctxt[current]
+    v = ctxt['v']
+    g = curr_eq.diff(v)
+    print('\tdI/dv:', g)
+    if g != 0 and g.diff(v) == 0:
+        print(f'\t{current} seems ohmic!')
+    return g
 
 def process_current_law(ast):
     currents = find_currents(ast)
     for current, ctxt in currents.items():
         print('Found current', current)
         #print('\tsymbolic context:', list(ctxt.items()))
-
-        print('\tCalculating conductance')
-        curr_eq = ctxt[current]
-        v = ctxt['v']
-        g = curr_eq.diff(v)
-        print('\tdI/dv:', g)
-        if g != 0 and g.diff(v) == 0:
-            print(f'\t{current} seems ohmic!')
-
+        g = conductance(current, ctxt)
         states = get_state_vars(ast)
         print('\tfound state variables', states)
         gbar_n_gates = match_cond_states(g, states)
@@ -131,7 +152,7 @@ def process_current_law(ast):
         #    (1-n)*alpha - n*beta : gateHHrates
         #            forwardRate (HHexp HHSigmoid HHExplinear)
         #            reverseRate (HHexp HHSigmoid HHExplinear)
-
-        print(check_gate_dynamics(ast, gbar_n_gates))
+        dxs = check_gate_dynamics(ast, gbar_n_gates)
+        simp_dxs = simplify_derivatives(dxs,states)
 
 
