@@ -154,13 +154,27 @@ def match_standard_rates(expr, subs={}):
     return m
 
 def replace_standards_in_sequence(seq, ctxt):
+    def absorb_scalar(name, expr): # TODO: factor out
+        stds_to_reps = {v[1]:v[0] for v in replacements.values()}
+        stds = [r[1] for r in replacements.values()]
+        a = sp.Wild('a', properties=[lambda k: k.is_Float])
+        s = sp.Wild('s', properties=[lambda k: k.is_Atom])
+        if expr.has(*stds):
+            if m := expr.match(a*s):
+                std = stds_to_reps[m[s]]
+                std.rate *= m[a]
+                sym = next(syms)
+                replacements[name] = (std, sym)
+                ctxt[name] = sym
+        return
     replacements = {}
-    syms = sp.numbered_symbols("std")
+    syms = sp.numbered_symbols("std",real=True)
     for name, expr in seq.items():
         syex = sp.S(expr, ctxt)
-        if m:= match_standard_rates(sp.S(expr, ctxt).doit()):
+        if m := match_standard_rates(syex):
             syex = next(syms)
-            replacements[name] = m
+            replacements[name] = (m, syex)
         ctxt[name] = syex
-
+        absorb_scalar(name, syex) #TODO: other optimizations possible here
     return ctxt, replacements
+

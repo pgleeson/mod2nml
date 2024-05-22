@@ -118,6 +118,7 @@ def simplify_derivatives(exprs, states):
         #ctxt[s] = sym.sp.Symbol(s, real=True)
         replaced, replacements = nml.replace_standards_in_sequence(exprseq, ctxt)
         res[s] = nml.match_dynamics(replaced, ctxt[s], replacements)
+        #breakpoint()
     return res
 
 
@@ -144,5 +145,7 @@ def process_current_law(ast):
 
         dxs = get_gate_dynamics(ast)
         simp_dxs = simplify_derivatives(dxs,states)
+        print(f'\tmatching dynamics to known forms', end=': ')
+        print(simp_dxs)
 
 

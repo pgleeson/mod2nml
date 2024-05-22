@@ -51,6 +51,7 @@ def test_gate_dynamics():
         USEION k READ ek WRITE ik REPRESENTS CHEBI:29103
         RANGE gkbar, gk
         RANGE gna
+        GLOBAL alpha, beta
     }
     PARAMETER { gkbar = .036 }
     STATE { n }
@@ -62,7 +63,7 @@ def test_gate_dynamics():
     DERIVATIVE states {
         alpha = .01*-(v+55)/(exp(-(v+55)/10)-1)
         beta = .125*exp(-(v+65)/80)
-        n' = alpha*(1-n)  - beta*n
+        n' = alpha*(1-n) - beta*n
     }
     """
     ast = m2n.parse_mod(mod)
@@ -78,6 +79,7 @@ def test_gate_dynamics_ti():
         USEION k READ ek WRITE ik REPRESENTS CHEBI:29103
         RANGE gkbar, gk
         RANGE gna
+        GLOBAL inf, tau
     }
     PARAMETER { gkbar = .036 }
     STATE { n }
@@ -97,4 +99,14 @@ def test_gate_dynamics_ti():
     dxs = m2n.get_gate_dynamics(ast)
     simp_dxs = m2n.simplify_derivatives(dxs,states)
     print(simp_dxs)
+
+def test_subroutine():
+    with open("sample_mods/k_hh.mod") as f:
+        mod = f.read()
+    AST = m2n.parse_mod(mod)
+    m2n.nmodl.symtab.SymtabVisitor().visit_program(AST)
+    #m2n.nmodl.visitor.ConstantFolderVisitor().visit_program(AST)
+    m2n.nmodl.visitor.InlineVisitor().visit_program(AST)
+    #m2n.nmodl.visitor.LocalVarRenameVisitor().visit_program(AST)
+    m2n.process_current_law(AST)
 
