@@ -11,6 +11,11 @@ def parse_mod(modstring):
     ast = driver.parse_string(modstring)
     return ast
 
+def ast_inline_fold(AST):
+    nmodl.symtab.SymtabVisitor().visit_program(AST)
+    nmodl.visitor.ConstantFolderVisitor().visit_program(AST)
+    nmodl.visitor.InlineVisitor().visit_program(AST)
+    nmodl.visitor.LocalVarRenameVisitor().visit_program(AST)
 
 def get_global_vars(modast):
     symtab.SymtabVisitor().visit_program(modast)

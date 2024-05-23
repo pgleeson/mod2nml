@@ -100,13 +100,29 @@ def test_gate_dynamics_ti():
     simp_dxs = m2n.simplify_derivatives(dxs,states)
     print(simp_dxs)
 
-def test_subroutine():
+def test_rates_in_function():
     with open("sample_mods/k_hh.mod") as f:
         mod = f.read()
-    AST = m2n.parse_mod(mod)
-    m2n.nmodl.symtab.SymtabVisitor().visit_program(AST)
-    #m2n.nmodl.visitor.ConstantFolderVisitor().visit_program(AST)
-    m2n.nmodl.visitor.InlineVisitor().visit_program(AST)
-    #m2n.nmodl.visitor.LocalVarRenameVisitor().visit_program(AST)
-    m2n.process_current_law(AST)
+    ast = m2n.parse_mod(mod)
+    m2n.ast_inline_fold(ast)
 
+    states = m2n.get_state_vars(ast)
+    dxs = m2n.get_gate_dynamics(ast)
+    simp_dxs = m2n.simplify_derivatives(dxs,states)
+    fwd = simp_dxs['n'].forward[0]
+    rev = simp_dxs['n'].reverse[0]
+
+    # from modfile
+    #    alpha = .01*alpha_f(-(v+55),10)
+    #    beta = .125*exp(-(v+65)/80)
+
+    assert isinstance(fwd, m2n.nml.HHExpLinearRate)
+    assert isinstance(rev, m2n.nml.HHExpRate)
+
+    assert fwd.rate == 0.1
+    assert fwd.midpoint == -55
+    assert fwd.scale == 10
+
+    assert rev.rate == 0.125
+    assert rev.midpoint == -65
+    assert rev.scale == -80
