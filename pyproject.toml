@@ -25,7 +25,7 @@ dependencies = [
 mod2nml = "mod2nml.cli:main"
 
 [tool.hatch.build.force-include]
-"tests" = "tests/"
+"tests" = "mod2nml/tests/"
 
 [project.urls]
 "Homepage" = "https://github.com/borismarin/mod2nml/"
