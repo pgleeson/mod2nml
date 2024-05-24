@@ -179,3 +179,29 @@ def replace_standards_in_sequence(seq, ctxt):
         absorb_scalar(name, syex) #TODO: other optimizations possible here
     return ctxt, replacements
 
+
+class IntermediateRepresentation:
+    def __init__(self, name):
+        self.name = name
+        self.currents = []
+    def __repr__(self):
+        r = f'# Modfile defining suffix {self.name}\n'
+        r += '\n\t'.join(str(c) for c in self.currents)
+        return r
+
+class Current:
+    def __init__(self, name, ion):
+        self.name = name
+        self.ion = ion
+
+    def __repr__(self):
+        r = '\n'.join((f'\tCurrent {self.name}, ion {self.ion}:\n',
+                       f'\t\t Conductance {self.g}',
+                       f'\t\t Gates {self.gbar_n_gates}',
+                       f'\t\t Dynamics {self.simp_dxs}'))
+        return r
+
+class NMLWrapper:
+    from xml.etree.ElementTree import Element, SubElement, Comment
+    def __init__(self):
+        self.toplevel = Element('neuroml')

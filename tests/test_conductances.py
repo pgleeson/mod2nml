@@ -21,8 +21,8 @@ def test_find_current():
         ina = gna*drf
     }
     """
-    currs = m2n.find_currents(m2n.parse_mod(mod))
-    assert str(currs['ina']['ina']) == 'gna*(-ena + v)'
+    ina = m2n.find_currents(m2n.parse_mod(mod))['ina'][1]
+    assert str(ina['ina']) == 'gna*(-ena + v)'
 
 def test_match_gates():
     mod = """
@@ -36,8 +36,8 @@ def test_match_gates():
     }
     """
     ast = m2n.parse_mod(mod)
-    currs = m2n.find_currents(ast)
-    gna = m2n.conductance('ina', currs['ina'])
+    ina = m2n.find_currents(ast)['ina'][1]
+    gna = m2n.conductance('ina', ina)
     assert str(gna) == 'gna*h*m**3'
     states = m2n.get_state_vars(ast)
     gates = m2n.match_cond_states(gna, states)

@@ -70,6 +70,10 @@ def scope_for_block(block):
     locs = get_local_vars(block)
     return locs | globs
 
+def get_suffix(modast):
+    lookup_visitor = visitor.AstLookupVisitor()
+    suf = lookup_visitor.lookup(modast, ast.AstNodeType.SUFFIX)[0] # TODO: is more than one even possible??
+    return suf.get_node_name()
 
 def find_currents(modast):
     lookup_visitor = visitor.AstLookupVisitor()
@@ -84,8 +88,8 @@ def find_currents(modast):
     scope = scope_for_block(bps[0])# TODO: assuming single BP
     asgns = get_assignments(bps[0])
 
-    curr_eqs = {c: sym.sympy_context_for_var(c, scope, asgns)
-                for c in currents}
+    curr_eqs = {c: (i, sym.sympy_context_for_var(c, scope, asgns))
+                for c,i in currents.items()}
 
     return curr_eqs
 
@@ -135,30 +139,41 @@ def conductance(current, ctxt):
     return g
 
 def process_current_law(ast):
-    from io import StringIO
-    s = StringIO()
-    for current, ctxt in find_currents(ast).items():
-        print('Found current', current, file=s)
+
+    ir = nml.IntermediateRepresentation(get_suffix(ast))
+
+    for current, (ion,ctxt) in find_currents(ast).items():
+        cir = nml.Current(current, ion)
+
+        #print('\tFound current', current)
         g = conductance(current, ctxt)
-        print('\tConductance:', g, file = s)
+        #print('\t\tConductance:', g)
         if g != 0 and g.diff(ctxt['v']) == 0:
-            print(f'\t{current} seems ohmic!', file=s)
+            print(f'\t\t{current} seems ohmic!')
+        else:
+            raise Exception("Can't process non-ohmic currents yet!")
+        cir.g = g
 
         states = get_state_vars(ast)
-        print('\tfound state variables', states, file=s)
+        #print('\tfound state variables', states)
+        cir.states = states
 
         gbar_n_gates = match_cond_states(g, states)
-        print(f'\tmatching conductances to product of powers of states', end=': ', file=s)
-        print(gbar_n_gates, file = s)
+        #print(f'\tmatching conductances to product of powers of states', end=': ')
+        #print(gbar_n_gates)
+        cir.gbar_n_gates = gbar_n_gates
 
         dxs = get_gate_dynamics(ast)
         simp_dxs = simplify_derivatives(dxs,states)
-        print(f'\tmatching dynamics to known forms', end=': ', file=s)
-        print(simp_dxs, file=s)
+        #print(f'\tmatching dynamics to known forms', end=': ')
+        #print(simp_dxs)
+        cir.simp_dxs = simp_dxs
+        ir.currents.append(cir)
 
-    return s.getvalue()
+    return str(ir)
 
 def compile_mod(modfile):
     header = f'Processing {modfile}...\n'
     ast = parse_mod(open(modfile).read())
+    ast_inline_fold(ast)
     return header + process_current_law(ast)

@@ -19,7 +19,8 @@ classifiers = [
 dependencies = [
 "sympy",
 "nmodl",
-"pytest"
+"pytest",
+"xmltodict"
 ]
 [project.scripts]
 mod2nml = "mod2nml.cli:main"
