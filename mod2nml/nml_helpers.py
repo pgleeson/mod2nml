@@ -1,5 +1,6 @@
 import sympy as sp
-from symbolic import *
+
+from .symbolic import *
 
 class baseHHrate:
     def __init__(self, r, m, s):

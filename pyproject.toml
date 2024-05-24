@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mod2nml"
+version = "0.0.1"
+authors = [
+  { name="Bóris Marin", email="boris.marin@ufabc.edu.br" },
+]
+description = "Compiling nmodl files to NeuroML"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+"sympy",
+"nmodl",
+"pytest"
+]
+[project.scripts]
+mod2nml = "mod2nml.cli:main"
+
+[tool.hatch.build.force-include]
+"tests" = "tests/"
+
+[project.urls]
+"Homepage" = "https://github.com/borismarin/mod2nml/"
+"Bug Tracker" = "https://github.com/borismarin/mod2nml/issues"

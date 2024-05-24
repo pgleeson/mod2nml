@@ -1,7 +1,7 @@
 import sympy as sp
 from collections import OrderedDict
 
-import nml_helpers as nml
+from mod2nml import nml_helpers as nml
 
 
 def test_match_hhexp():
@@ -76,5 +76,5 @@ def test_match_multiexpr_odes():
     m = nml.match_alpha_beta_tau_inf(replaced["dn"], n)
     assert m["alpha"] == replaced["alphan"]
     assert m["beta"] == replaced["betan"]
-    assert type(replacements["betan"]) == nml.HHExpRate
-    assert type(replacements["alphan"]) == nml.HHExpLinearRate
+    assert type(replacements["betan"][0]) == nml.HHExpRate
+    assert type(replacements["alphan"][0]) == nml.HHExpLinearRate

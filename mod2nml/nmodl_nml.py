@@ -1,8 +1,9 @@
 from collections import OrderedDict
 import nmodl.dsl as nmodl
 from nmodl import ast, visitor, symtab
-import symbolic as sym
-import nml_helpers as nml
+
+from . import symbolic as sym
+from . import nml_helpers as nml
 
 #from functools import lru_cache
 #@lru_cache
@@ -134,23 +135,30 @@ def conductance(current, ctxt):
     return g
 
 def process_current_law(ast):
+    from io import StringIO
+    s = StringIO()
     for current, ctxt in find_currents(ast).items():
-        print('Found current', current)
+        print('Found current', current, file=s)
         g = conductance(current, ctxt)
-        print('\tConductance:', g)
+        print('\tConductance:', g, file = s)
         if g != 0 and g.diff(ctxt['v']) == 0:
-            print(f'\t{current} seems ohmic!')
+            print(f'\t{current} seems ohmic!', file=s)
 
         states = get_state_vars(ast)
-        print('\tfound state variables', states)
+        print('\tfound state variables', states, file=s)
 
         gbar_n_gates = match_cond_states(g, states)
-        print(f'\tmatching conductances to product of powers of states', end=': ')
-        print(gbar_n_gates)
+        print(f'\tmatching conductances to product of powers of states', end=': ', file=s)
+        print(gbar_n_gates, file = s)
 
         dxs = get_gate_dynamics(ast)
         simp_dxs = simplify_derivatives(dxs,states)
-        print(f'\tmatching dynamics to known forms', end=': ')
-        print(simp_dxs)
+        print(f'\tmatching dynamics to known forms', end=': ', file=s)
+        print(simp_dxs, file=s)
 
+    return s.getvalue()
 
+def compile_mod(modfile):
+    header = f'Processing {modfile}...\n'
+    ast = parse_mod(open(modfile).read())
+    return header + process_current_law(ast)
