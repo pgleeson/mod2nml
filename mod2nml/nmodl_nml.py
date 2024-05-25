@@ -18,7 +18,7 @@ def parse_mod(modstring):
 def ast_inline_fold(AST):
     from wurlitzer import pipes
 
-    with pipes() as (stdout, stderr): # DIE WARNINGS DIE
+    with pipes() as (stdout, stderr): # death to C warnings
         nmodl.symtab.SymtabVisitor().visit_program(AST)
         nmodl.visitor.ConstantFolderVisitor().visit_program(AST)
         nmodl.visitor.InlineVisitor().visit_program(AST)
@@ -155,22 +155,30 @@ def analyse_currents(ast):
         print('\tConductance:', g)
         if g != 0 and g.diff(ctxt['v']) == 0:
             print(f'\t{current} seems ohmic!')
+            chan = neuroml.IonChannelHH(id=current, species=ion, conductance="10pS")
         cir.g = g
 
         states = get_state_vars(ast)
         print('\tfound state variables', states)
         cir.states = states
 
-        gbar_n_gates = match_cond_states(g, states)
-        print(f'\tmatching conductances to product of powers of states', end=': ')
-        print(gbar_n_gates)
-        cir.gbar_n_gates = gbar_n_gates
+        def analyse_gates(g, states):
+            gbar_n_gates = match_cond_states(g, states)
+            print(f'\tmatching conductances to product of powers of states', end=': ')
+            print(gbar_n_gates)
+            return gbar_n_gates
 
+        cir.gbar_n_gates = analyse_gates(g, states)
+
+        # TODO: function for processing each gate
+        # pattern match on expression type (decouple exprs from nml)
         dxs = get_gate_dynamics(ast)
         simp_dxs = simplify_derivatives(dxs,states)
         print(f'\tmatching dynamics to known forms', end=': ')
         print(simp_dxs)
         cir.simp_dxs = simp_dxs
+
+        #chan.gate_hh_rates.append(n_gate)
 
         currents.append(cir)
 

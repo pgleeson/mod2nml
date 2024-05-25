@@ -4,25 +4,25 @@ from collections import OrderedDict
 from mod2nml import nml_helpers as nml
 
 
-def test_match_hhexp():
+def test_match_exp():
     beta = 0.125 * sp.exp(-(nml.v + 65) / 80)
-    r = nml.HHExpRate.match(beta)
+    r = nml.Exponential.match(beta)
     assert r.rate == 0.125
     assert r.midpoint == -65
     assert r.scale == -80
 
 
-def test_match_hhexplinear():
+def test_match_explinear():
     alpha = -0.01 * (nml.v + 60) / (sp.exp(-(nml.v + 60) / 10) - 1)
-    r = nml.HHExpLinearRate.match(alpha)
+    r = nml.ExpLinear.match(alpha)
     assert r.rate == 0.1
     assert r.midpoint == -60
     assert r.scale == 10
 
 
-def test_match_hhsigmoid():
+def test_match_sigmoid():
     minf = 1 / (1 + sp.exp((-nml.v - 48) / 10))
-    r = nml.HHSigmoidRate.match(minf)
+    r = nml.Sigmoidal.match(minf)
     assert r.rate == 1
     assert r.midpoint == -48
     assert r.scale == 10
@@ -76,5 +76,5 @@ def test_match_multiexpr_odes():
     m = nml.match_alpha_beta_tau_inf(replaced["dn"], n)
     assert m["alpha"] == replaced["alphan"]
     assert m["beta"] == replaced["betan"]
-    assert type(replacements["betan"][0]) == nml.HHExpRate
-    assert type(replacements["alphan"][0]) == nml.HHExpLinearRate
+    assert type(replacements["betan"][0]) == nml.Exponential
+    assert type(replacements["alphan"][0]) == nml.ExpLinear

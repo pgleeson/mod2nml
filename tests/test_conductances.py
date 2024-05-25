@@ -116,8 +116,8 @@ def test_rates_in_function():
     #    alpha = .01*alpha_f(-(v+55),10)
     #    beta = .125*exp(-(v+65)/80)
 
-    assert isinstance(fwd, m2n.nml.HHExpLinearRate)
-    assert isinstance(rev, m2n.nml.HHExpRate)
+    assert isinstance(fwd, m2n.nml.ExpLinear)
+    assert isinstance(rev, m2n.nml.Exponential)
 
     assert fwd.rate == 0.1
     assert fwd.midpoint == -55

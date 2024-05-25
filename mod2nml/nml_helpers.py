@@ -2,7 +2,7 @@ import sympy as sp
 
 from .symbolic import *
 
-class baseHHrate:
+class StdExpr:
     def __init__(self, r, m, s):
         self.rate = r
         self.midpoint = m
@@ -11,7 +11,7 @@ class baseHHrate:
         return f'{type(self).__name__}[rate:{self.rate:.3f}, '\
                 f'midpoint:{self.midpoint}, scale:{self.scale}]'
 
-class HHExpRate(baseHHrate):
+class Exponential(StdExpr):
     @classmethod
     def match(cls, expr):
         ret = None
@@ -37,7 +37,7 @@ class HHExpRate(baseHHrate):
         return self.rate * sp.exp(x)
 
 
-class HHSigmoidRate(baseHHrate):
+class Sigmoidal(StdExpr):
     @classmethod
     def match(cls, expr):
         ret = None
@@ -63,7 +63,7 @@ class HHSigmoidRate(baseHHrate):
         return self.rate / (1 + sp.exp(-x))
 
 
-class HHExpLinearRate(baseHHrate):
+class ExpLinear(StdExpr):
     @classmethod
     def match(cls, expr):
         ret = None
@@ -100,7 +100,7 @@ def match_dynamics(exprs, statevar, replacements={}):
     b = sp.Wild("b", exclude=[n])
     expr = exprs[statevar.name+'\\prime']
     ddn = expr.diff(n)  # d(dn/dt)/dn = -1/tau = -1/(alpha+beta) for 1st order kinetics
-    #eqs = {}
+
     ret = None
     if m := (
         sp.solve(expr, n)[0].match(a / (a + b))
@@ -113,8 +113,6 @@ def match_dynamics(exprs, statevar, replacements={}):
             if exprs[r] == beta:
                 beta = v
         ret = GateHHrates(alpha, beta)
-        #eqs["alpha"] = m[a]
-        #eqs["beta"] = m[b]
     elif s := sp.solve(expr, n):
         tau = -1/ddn
         inf = s[0]
@@ -124,11 +122,8 @@ def match_dynamics(exprs, statevar, replacements={}):
             if exprs[r] == inf:
                 inf = v
         ret = GateHHtauInf(tau, inf)
-        #eqs["tau"] = -1 / ddn
-        #eqs["inf"] = s[0]
 
     return ret
-    #return eqs
 
 class GateHHrates:
     def __init__(self, alpha, beta):
@@ -149,7 +144,7 @@ class GateHHtauInf:
 
 def match_standard_rates(expr, subs={}):
     m = None
-    for r in [cls for cls in baseHHrate.__subclasses__()]:
+    for r in [cls for cls in StdExpr.__subclasses__()]:
         if m := r.match(expr):
             break
     return m
