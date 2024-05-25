@@ -1,9 +1,12 @@
 from collections import OrderedDict
+
 import nmodl.dsl as nmodl
 from nmodl import ast, visitor, symtab
 
 from . import symbolic as sym
 from . import nml_helpers as nml
+
+import neuroml
 
 #from functools import lru_cache
 #@lru_cache
@@ -13,10 +16,13 @@ def parse_mod(modstring):
     return ast
 
 def ast_inline_fold(AST):
-    nmodl.symtab.SymtabVisitor().visit_program(AST)
-    nmodl.visitor.ConstantFolderVisitor().visit_program(AST)
-    nmodl.visitor.InlineVisitor().visit_program(AST)
-    nmodl.visitor.LocalVarRenameVisitor().visit_program(AST)
+    from wurlitzer import pipes
+
+    with pipes() as (stdout, stderr): # DIE WARNINGS DIE
+        nmodl.symtab.SymtabVisitor().visit_program(AST)
+        nmodl.visitor.ConstantFolderVisitor().visit_program(AST)
+        nmodl.visitor.InlineVisitor().visit_program(AST)
+        nmodl.visitor.LocalVarRenameVisitor().visit_program(AST)
 
 def get_global_vars(modast):
     symtab.SymtabVisitor().visit_program(modast)
@@ -138,42 +144,53 @@ def conductance(current, ctxt):
     g = curr_eq.diff(v)
     return g
 
-def process_current_law(ast):
 
-    ir = nml.IntermediateRepresentation(get_suffix(ast))
-
+def analyse_currents(ast):
+    currents = []
     for current, (ion,ctxt) in find_currents(ast).items():
         cir = nml.Current(current, ion)
 
-        #print('\tFound current', current)
+        print('\tFound current', current)
         g = conductance(current, ctxt)
-        #print('\t\tConductance:', g)
+        print('\tConductance:', g)
         if g != 0 and g.diff(ctxt['v']) == 0:
-            print(f'\t\t{current} seems ohmic!')
-        else:
-            raise Exception("Can't process non-ohmic currents yet!")
+            print(f'\t{current} seems ohmic!')
         cir.g = g
 
         states = get_state_vars(ast)
-        #print('\tfound state variables', states)
+        print('\tfound state variables', states)
         cir.states = states
 
         gbar_n_gates = match_cond_states(g, states)
-        #print(f'\tmatching conductances to product of powers of states', end=': ')
-        #print(gbar_n_gates)
+        print(f'\tmatching conductances to product of powers of states', end=': ')
+        print(gbar_n_gates)
         cir.gbar_n_gates = gbar_n_gates
 
         dxs = get_gate_dynamics(ast)
         simp_dxs = simplify_derivatives(dxs,states)
-        #print(f'\tmatching dynamics to known forms', end=': ')
-        #print(simp_dxs)
+        print(f'\tmatching dynamics to known forms', end=': ')
+        print(simp_dxs)
         cir.simp_dxs = simp_dxs
-        ir.currents.append(cir)
 
-    return str(ir)
+        currents.append(cir)
+
+    return [cir.to_neuroml() for cir in currents]
+
+def generate_neuroml(ast):
+    nmldoc = neuroml.NeuroMLDocument()
+
+    suff = get_suffix(ast)
+    print("# Processing file defining suffix", suff)
+    nmldoc.id = suff
+
+    chans = analyse_currents(ast)
+    print(chans)
+    #nmldoc.ion_channel_hhs.append(chans)
+
+    return nmldoc
 
 def compile_mod(modfile):
-    header = f'Processing {modfile}...\n'
+    print("# Processing", modfile)
     ast = parse_mod(open(modfile).read())
     ast_inline_fold(ast)
-    return header + process_current_law(ast)
+    return generate_neuroml(ast)

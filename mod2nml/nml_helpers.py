@@ -186,7 +186,7 @@ class IntermediateRepresentation:
         self.currents = []
     def __repr__(self):
         r = f'# Modfile defining suffix {self.name}\n'
-        r += '\n\t'.join(str(c) for c in self.currents)
+        r += str(self.currents[0]) + '\n'.join(str(c) for c in self.currents[1:])
         return r
 
 class Current:
@@ -195,13 +195,11 @@ class Current:
         self.ion = ion
 
     def __repr__(self):
-        r = '\n'.join((f'\tCurrent {self.name}, ion {self.ion}:\n',
-                       f'\t\t Conductance {self.g}',
-                       f'\t\t Gates {self.gbar_n_gates}',
-                       f'\t\t Dynamics {self.simp_dxs}'))
+        r = f'Current {self.name}, ion {self.ion}:\n' +\
+            '\n'.join((f'\tConductance {self.g}',
+                       f'\tGates {self.gbar_n_gates}',
+                       f'\tDynamics {self.simp_dxs}'))
         return r
+    def to_neuroml(self):
+        return str(self)
 
-class NMLWrapper:
-    from xml.etree.ElementTree import Element, SubElement, Comment
-    def __init__(self):
-        self.toplevel = Element('neuroml')

@@ -20,8 +20,11 @@ dependencies = [
 "sympy",
 "nmodl",
 "pytest",
-"xmltodict"
+"xmltodict",
+"libNeuroML",
+"wurlitzer"
 ]
+
 [project.scripts]
 mod2nml = "mod2nml.cli:main"
 
