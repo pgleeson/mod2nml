@@ -48,15 +48,17 @@ def get_local_vars(block):
 def get_assignments(blk):
     lookup_visitor = visitor.AstLookupVisitor()
     binexprs = lookup_visitor.lookup(blk, ast.AstNodeType.BINARY_EXPRESSION)
-    assignments = OrderedDict()
+    #assignments = OrderedDict()
+    assignments = []
     for expr in binexprs:
         if expr.lhs.is_var_name() and expr.op.eval() == '=':
             n = expr.lhs.get_node_name()
             if expr.lhs.name.is_prime_name():
                 n = n+'\\prime'
-            assignments[n] = nmodl.to_nmodl(
-                expr.rhs, {nmodl.ast.UNIT, nmodl.ast.UNIT_DEF})
-
+            #if n in assignments:
+            #    print("VARIABLE", n, "BEING REWRITTEN")
+            assignments.append((n, nmodl.to_nmodl(
+                expr.rhs, {nmodl.ast.UNIT, nmodl.ast.UNIT_DEF})))
     return assignments
 
 def get_state_vars(modast):
@@ -122,6 +124,15 @@ def get_gate_dynamics(modast):
         dyn_eqs = {v.get_node_name(): (scope, asgns) for v in primes}
     return dyn_eqs
 
+def rename_reused_vars(exprs):
+    names = []
+    for i, (var, val) in enumerate(exprs):
+        if var in names:
+            print('# Variable', var, 'rewritten. Old value:',
+                  [v for n,v in exprs[:i] if n==var], 'new:', val)
+            exprs[i] = (var + '_', val) # TODO: better renaming scheme
+        names.append(var)
+
 def simplify_derivatives(exprs, states):
     res = {}
     for s in states:
@@ -131,10 +142,9 @@ def simplify_derivatives(exprs, states):
             print("Couldn't find dynamics for variable", s)
             return None
         ctxt = {s:sym.sp.Symbol(s, real=True) for s in locvars}
-        #ctxt[s] = sym.sp.Symbol(s, real=True)
+        rename_reused_vars(exprseq)
         replaced, replacements = nml.replace_standards_in_sequence(exprseq, ctxt)
         res[s] = nml.match_dynamics(replaced, ctxt[s], replacements)
-        #breakpoint()
     return res
 
 

@@ -3,11 +3,6 @@ import sympy as sp
 
 from mod2nml import nmodl_nml as m2n
 
-def test_hhrates():
-    #with open("sample_mods/k_hh_ab.mod") as f:
-    with open("./sample_mods/hh_ab.mod") as f:
-        mod = f.read()
-    m2n.analyse_currents(m2n.parse_mod(mod))
 
 def test_find_current():
     mod = """
@@ -73,7 +68,7 @@ def test_gate_dynamics():
     print(simp_dxs)
 
 
-def test_gate_dynamics_ti():
+def test_gate_dynamics_tauinf():
     mod = """
     NEURON {
         USEION k READ ek WRITE ik REPRESENTS CHEBI:29103
@@ -126,3 +121,11 @@ def test_rates_in_function():
     assert rev.rate == 0.125
     assert rev.midpoint == -65
     assert rev.scale == -80
+
+
+def test_reused_vars_funccall():
+    with open("./sample_mods/na_hh.mod") as f:
+        mod = f.read()
+    ast = m2n.parse_mod(mod)
+    m2n.ast_inline_fold(ast)
+    m2n.analyse_currents(ast)

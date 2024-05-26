@@ -165,7 +165,7 @@ def replace_standards_in_sequence(seq, ctxt):
         return
     replacements = {}
     syms = sp.numbered_symbols("std",real=True)
-    for name, expr in seq.items():
+    for name, expr in seq:
         syex = sp.S(expr, ctxt)
         if m := match_standard_rates(syex):
             syex = next(syms)

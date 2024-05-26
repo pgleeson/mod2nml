@@ -63,14 +63,13 @@ def test_match_simple_odes():
 def test_match_multiexpr_odes():
     n = sp.Symbol("n", real=True)  # state var
     ctxt = dict([("n", n), ("v", nml.v)])
-    exprs = OrderedDict()
-
-    exprs["alphan"] = "-.01*(v+55)/(exp(-(v+55)/10)-1)"
-    exprs["betan"] = ".125*exp(-(v+65)/80)"
-    exprs["sum"] = "alphan + betan"
-    exprs["taun"] = "1/sum"
-    exprs["ninf"] = "alphan/sum"
-    exprs["dn"] = "(ninf-n)/taun"
+    exprs = [
+    ("alphan", "-.01*(v+55)/(exp(-(v+55)/10)-1)"),
+    ("betan", ".125*exp(-(v+65)/80)"),
+    ("sum", "alphan + betan"),
+    ("taun", "1/sum"),
+    ("ninf", "alphan/sum"),
+    ("dn", "(ninf-n)/taun")]
 
     replaced, replacements = nml.replace_standards_in_sequence(exprs, ctxt)
     m = nml.match_alpha_beta_tau_inf(replaced["dn"], n)
