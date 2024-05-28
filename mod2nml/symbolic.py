@@ -26,10 +26,8 @@ def sympy_context_for_var(var, blk_vars, blk_assignments):
     # locals / globals
     ctxt = OrderedDict([(v, sp.symbols(v, real=True))
                         for v in blk_vars
-                        #if v not in blk_assignments.keys()]))
                         if v not in [v for v, k in blk_assignments]])
 
-    #for v, eq in blk_assignments.items():
     for v, eq in blk_assignments:
         if v in ctxt:
             print('## Variable', v, 'rewritten') # TODO: create test for that

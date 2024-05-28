@@ -5,6 +5,7 @@ from nmodl import ast, visitor, symtab
 
 from . import symbolic as sym
 from . import nml_helpers as nml
+from .rename_visitor import RenameReusedVisitor
 
 import neuroml
 
@@ -48,7 +49,6 @@ def get_local_vars(block):
 def get_assignments(blk):
     lookup_visitor = visitor.AstLookupVisitor()
     binexprs = lookup_visitor.lookup(blk, ast.AstNodeType.BINARY_EXPRESSION)
-    #assignments = OrderedDict()
     assignments = []
     for expr in binexprs:
         if expr.lhs.is_var_name() and expr.op.eval() == '=':
@@ -56,7 +56,7 @@ def get_assignments(blk):
             if expr.lhs.name.is_prime_name():
                 n = n+'\\prime'
             #if n in assignments:
-            #    print("VARIABLE", n, "BEING REWRITTEN")
+            #    print("# Variable", n, "being rewritten!")
             assignments.append((n, nmodl.to_nmodl(
                 expr.rhs, {nmodl.ast.UNIT, nmodl.ast.UNIT_DEF})))
     return assignments
@@ -118,20 +118,15 @@ def get_gate_dynamics(modast):
     if deqs:
         primes = lookup_visitor.lookup(deqs[0], ast.AstNodeType.PRIME_NAME)
         scope = scope_for_block(deqs[0])
+        rename_reused_vars(deqs[0])
         asgns = get_assignments(deqs[0])
-        #dyn_eqs = {v.get_node_name(): sym.sympy_context_for_var(v.get_node_name(), scope, asgns)
-        #         for v in primes}
         dyn_eqs = {v.get_node_name(): (scope, asgns) for v in primes}
     return dyn_eqs
 
-def rename_reused_vars(exprs):
-    names = []
-    for i, (var, val) in enumerate(exprs):
-        if var in names:
-            print('# Variable', var, 'rewritten. Old value:',
-                  [v for n,v in exprs[:i] if n==var], 'new:', val)
-            exprs[i] = (var + '_', val) # TODO: better renaming scheme
-        names.append(var)
+
+def rename_reused_vars(blk):
+    blk.accept(RenameReusedVisitor())
+
 
 def simplify_derivatives(exprs, states):
     res = {}
@@ -142,7 +137,8 @@ def simplify_derivatives(exprs, states):
             print("Couldn't find dynamics for variable", s)
             return None
         ctxt = {s:sym.sp.Symbol(s, real=True) for s in locvars}
-        rename_reused_vars(exprseq)
+        #ctxt = {'v':sym.sp.Symbol('v', real=True), s:sym.sp.Symbol(s, real=True)} #test
+        nml.replace_reused_symbols(exprseq, ctxt)
         replaced, replacements = nml.replace_standards_in_sequence(exprseq, ctxt)
         res[s] = nml.match_dynamics(replaced, ctxt[s], replacements)
     return res
@@ -155,44 +151,38 @@ def conductance(current, ctxt):
     return g
 
 
+
+def match_hh_gating(g, states):
+    gbar_n_gates = match_cond_states(g, states)
+    #print(f'\tmatching conductances to product of powers of states', end=': ')
+    #print(gbar_n_gates)
+    return gbar_n_gates
+
 def analyse_currents(ast):
-    currents = []
+    channs = []
     for current, (ion,ctxt) in find_currents(ast).items():
-        cir = nml.Current(current, ion)
 
         print('\tFound current', current)
         g = conductance(current, ctxt)
         print('\tConductance:', g)
         if g != 0 and g.diff(ctxt['v']) == 0:
             print(f'\t{current} seems ohmic!')
-            chan = neuroml.IonChannelHH(id=current, species=ion, conductance="10pS")
-        cir.g = g
+            nml_chan = neuroml.IonChannelHH(id=current, species=ion, conductance="10pS")
 
         states = get_state_vars(ast)
-        print('\tfound state variables', states)
-        cir.states = states
+        #print('\tfound state variables', states)
 
-        def analyse_gates(g, states):
-            gbar_n_gates = match_cond_states(g, states)
-            print(f'\tmatching conductances to product of powers of states', end=': ')
-            print(gbar_n_gates)
-            return gbar_n_gates
+        gbar_n_gates = match_hh_gating(g, states)
 
-        cir.gbar_n_gates = analyse_gates(g, states)
-
-        # TODO: function for processing each gate
-        # pattern match on expression type (decouple exprs from nml)
         dxs = get_gate_dynamics(ast)
         simp_dxs = simplify_derivatives(dxs,states)
-        print(f'\tmatching dynamics to known forms', end=': ')
-        print(simp_dxs)
-        cir.simp_dxs = simp_dxs
+        #print(f'\tmatching dynamics to known forms')
+        #print(simp_dxs)
 
-        #chan.gate_hh_rates.append(n_gate)
-
-        currents.append(cir)
-
-    return [cir.to_neuroml() for cir in currents]
+        # TODO: ugly function with side effect
+        nml.match_hh_rates(g, gbar_n_gates, simp_dxs, nml_chan)
+        channs.append(nml_chan)
+    return channs
 
 def generate_neuroml(ast):
     nmldoc = neuroml.NeuroMLDocument()
@@ -202,8 +192,7 @@ def generate_neuroml(ast):
     nmldoc.id = suff
 
     chans = analyse_currents(ast)
-    print(chans)
-    #nmldoc.ion_channel_hhs.append(chans)
+    nmldoc.ion_channel_hhs.extend(chans)
 
     return nmldoc
 

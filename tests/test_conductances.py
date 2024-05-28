@@ -129,3 +129,12 @@ def test_reused_vars_funccall():
     ast = m2n.parse_mod(mod)
     m2n.ast_inline_fold(ast)
     m2n.analyse_currents(ast)
+
+
+def test_multiple_conds():
+    with open("./sample_mods/hh_clean.mod") as f:
+        mod = f.read()
+    ast = m2n.parse_mod(mod)
+    m2n.ast_inline_fold(ast)
+    for c in m2n.analyse_currents(ast):
+        print(c)

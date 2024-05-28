@@ -2,6 +2,9 @@ import sympy as sp
 
 from .symbolic import *
 
+import neuroml
+
+
 class StdExpr:
     def __init__(self, r, m, s):
         self.rate = r
@@ -94,6 +97,9 @@ class ExpLinear(StdExpr):
         x = (v - self.midpoint) / self.scale
         return self.rate * x / (1 - sp.exp(-x))
 
+
+
+
 def match_dynamics(exprs, statevar, replacements={}):
     n = statevar
     a = sp.Wild("a", exclude=[n])
@@ -149,6 +155,33 @@ def match_standard_rates(expr, subs={}):
             break
     return m
 
+std2nml_rates = {Exponential: 'HHExpRate', ExpLinear: 'HHExpLinear', Sigmoidal:'HHSigmoidRate'}
+def std_rates(expression):
+    try:
+        expr, symbol = expression
+    except TypeError:
+        expr = expression
+    match expr:
+        case Exponential() | ExpLinear() | Sigmoidal():
+            return neuroml.HHRate(type=std2nml_rates[type(expr)],
+                                  rate=f'{expr.rate}',
+                                  midpoint=f'{expr.midpoint}',
+                                  scale=f'{expr.scale}')
+        case _:
+            return neuroml.HHRate(type='Rate does not match standard form!')
+
+def replace_reused_symbols(seq, ctxt):
+    found = []
+    replaced = []
+    for name, expr in seq:
+        if name in found:
+            print('found reused name', name, 'with value', expr)
+            replaced.append(name)
+        found.append(name)
+        syex = sp.S(expr, ctxt)
+        ctxt[name] = syex
+    return ctxt, replaced
+
 def replace_standards_in_sequence(seq, ctxt):
     def absorb_scalar(name, expr): # TODO: factor out
         stds_to_reps = {v[1]:v[0] for v in replacements.values()}
@@ -167,6 +200,8 @@ def replace_standards_in_sequence(seq, ctxt):
     syms = sp.numbered_symbols("std",real=True)
     for name, expr in seq:
         syex = sp.S(expr, ctxt)
+        if name in replacements:
+            print('symbol', name, 'already replaced! was',replacements[name], 'want', syex )
         if m := match_standard_rates(syex):
             syex = next(syms)
             replacements[name] = (m, syex)
@@ -175,26 +210,22 @@ def replace_standards_in_sequence(seq, ctxt):
     return ctxt, replacements
 
 
-class IntermediateRepresentation:
-    def __init__(self, name):
-        self.name = name
-        self.currents = []
-    def __repr__(self):
-        r = f'# Modfile defining suffix {self.name}\n'
-        r += str(self.currents[0]) + '\n'.join(str(c) for c in self.currents[1:])
-        return r
+def match_hh_rates(conductance, gates_exponents, dynamics, nml_chan):
+    for gating_var in (m for m in gates_exponents if m != 'gbar'):
+        ge = gates_exponents[gating_var]
+        n_particles = ge.exp if isinstance(ge, sp.Pow) else 1
 
-class Current:
-    def __init__(self, name, ion):
-        self.name = name
-        self.ion = ion
-
-    def __repr__(self):
-        r = f'Current {self.name}, ion {self.ion}:\n' +\
-            '\n'.join((f'\tConductance {self.g}',
-                       f'\tGates {self.gbar_n_gates}',
-                       f'\tDynamics {self.simp_dxs}'))
-        return r
-    def to_neuroml(self):
-        return str(self)
-
+        match dyn:= dynamics[gating_var.name]:
+            case GateHHrates():
+                gate = neuroml.GateHHRates(id=gating_var.name, instances=n_particles)
+                gate.forward_rate = std_rates(dyn.forward)
+                gate.reverse_rate = std_rates(dyn.reverse)
+                nml_chan.gate_hh_rates.append(gate)
+            case GateHHtauInf():
+                gate = neuroml.GateHHTauInf(id=gating_var.name, instances=n_particles)
+                gate.steady_state = std_rates(dyn.steady_state)
+                gate.time_course = std_rates(dyn.time_course)
+                nml_chan.gate_hh_tauinf.append(gate)
+            case _:
+                gate = neuroml.Gate(id='Could not match gate dynamics to known forms!!')
+                nml_chan.gates.append(gate)
