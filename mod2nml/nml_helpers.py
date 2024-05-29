@@ -73,7 +73,10 @@ class ExpLinear(StdExpr):
         if c := extract_exp_arg(expr, inv=True):
             cann, V, s = c
             vv = (v - s[midpoint]) / s[scale]
-            (r,) = sp.solve(cann + vv.subs(s) * rate / (sp.exp(-V) - 1), rate)
+            try:
+                (r,) = sp.solve(cann + vv.subs(s) * rate / (sp.exp(-V) - 1), rate)
+            except ValueError: # TODO: better handling
+                return None
             if len(r.free_symbols) < 1:  # no spurious solutions found
                 ret = cls(r, s[midpoint], s[scale])
         return ret
@@ -232,7 +235,7 @@ def match_hh_rates(conductance, gates_exponents, dynamics, nml_chan):
                 gate = neuroml.GateHHTauInf(id=gating_var.name, instances=n_particles)
                 gate.steady_state = std_rates(dyn.steady_state)
                 gate.time_course = std_rates(dyn.time_course)
-                nml_chan.gate_hh_tauinf.append(gate)
+                nml_chan.gate_hh_tau_infs.append(gate)
             case _:
                 gate = neuroml.Gate(id='Could not match gate dynamics to known forms!!')
                 nml_chan.gates.append(gate)
