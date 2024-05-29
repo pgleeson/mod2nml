@@ -11,7 +11,7 @@ class StdExpr:
         self.midpoint = m
         self.scale = s
     def __repr__(self):
-        return f'{type(self).__name__}[rate:{self.rate:.3f}, '\
+        return f'{type(self).__name__}[rate:{self.rate}, '\
                 f'midpoint:{self.midpoint}, scale:{self.scale}]'
 
 class Exponential(StdExpr):
@@ -155,6 +155,15 @@ def match_standard_rates(expr, subs={}):
             break
     return m
 
+def pprint(x):
+    ret = x
+    if x.is_Float:
+        if x == int(x):
+            ret = sp.Integer(x)
+        else:
+            ret = f'{float(x):g}'
+    return ret
+
 std2nml_rates = {Exponential: 'HHExpRate', ExpLinear: 'HHExpLinear', Sigmoidal:'HHSigmoidRate'}
 def std_rates(expression):
     try:
@@ -164,9 +173,9 @@ def std_rates(expression):
     match expr:
         case Exponential() | ExpLinear() | Sigmoidal():
             return neuroml.HHRate(type=std2nml_rates[type(expr)],
-                                  rate=f'{expr.rate}',
-                                  midpoint=f'{expr.midpoint}',
-                                  scale=f'{expr.scale}')
+                                  rate=f'{pprint(expr.rate)}',
+                                  midpoint=f'{pprint(expr.midpoint)}',
+                                  scale=f'{pprint(expr.scale)}')
         case _:
             return neuroml.HHRate(type='Rate does not match standard form!')
 
@@ -186,7 +195,7 @@ def replace_standards_in_sequence(seq, ctxt):
     def absorb_scalar(name, expr): # TODO: factor out
         stds_to_reps = {v[1]:v[0] for v in replacements.values()}
         stds = [r[1] for r in replacements.values()]
-        a = sp.Wild('a', properties=[lambda k: k.is_Float])
+        a = sp.Wild('a', properties=[lambda k: k.is_Number])
         s = sp.Wild('s', properties=[lambda k: k.is_Atom])
         if expr.has(*stds):
             if m := expr.match(a*s):
@@ -200,8 +209,6 @@ def replace_standards_in_sequence(seq, ctxt):
     syms = sp.numbered_symbols("std",real=True)
     for name, expr in seq:
         syex = sp.S(expr, ctxt)
-        if name in replacements:
-            print('symbol', name, 'already replaced! was',replacements[name], 'want', syex )
         if m := match_standard_rates(syex):
             syex = next(syms)
             replacements[name] = (m, syex)
